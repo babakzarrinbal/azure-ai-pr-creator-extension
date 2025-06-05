@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      h3 {
+        margin-bottom: 20px;
+        font-size: 1.4rem;
+      }
+
+      label {
+        display: block;
+        margin-top: 15px;
+        font-weight: bold;
+      }
+
+      .hint {
+        font-size: 0.85rem;
+        color: #555;
+        margin-bottom: 5px;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px;
+        font-size: 1rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+      }
+
+      button {
+        margin-top: 25px;
+        padding: 10px 20px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 8px;
+        background: #0078d7;
+        color: white;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #005fa3;
+      }
+
+      #status {
+        margin-top: 15px;
+        font-weight: bold;
+        color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Set API Keys</h3>
+
+    <label>Gemini API Key:</label>
+    <div class="hint">Get it from <a href="https://makersuite.google.com/app/apikey" target="_blank">Google MakerSuite</a></div>
+    <input id="geminiKey" type="text" />
+
+    <label>Gemini Model:</label>
+    <div class="hint">Model list at <a href="https://ai.google.dev/models/gemini" target="_blank">ai.google.dev/models/gemini</a></div>
+    <input id="geminiModel" type="text" />
+
+    <label>Azure DevOps PAT:</label>
+    <div class="hint">Create from <a href="https://dev.azure.com/" target="_blank">Azure DevOps > User Settings > Personal Access Tokens</a></div>
+    <input id="azurePat" type="text" />
+
+    <button id="saveKeys">Save</button>
+    <p id="status"></p>
+
+    <script src="../js/options.js"></script>
+  </body>
+</html>
