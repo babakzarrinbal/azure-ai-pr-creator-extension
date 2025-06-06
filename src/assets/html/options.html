@@ -67,8 +67,12 @@
     <input id="geminiKey" type="text" />
 
     <label>Gemini Model:</label>
-    <div class="hint">Model list at <a href="https://ai.google.dev/models/gemini" target="_blank">ai.google.dev/models/gemini</a></div>
-    <input id="geminiModel" type="text" />
+    <div class="hint">Model list at <a href="https://ai.google.dev/models/gemini" target="_blank">ai.google.dev/models/gemini</a> later other models become possible</div>
+    <input id="geminiModel" disabled="true" type="text" />
+
+    <label>Gemini Multi call Threshold:</label>
+    <div class="hint">Threshold for multi calls to understand the repository files</div>
+    <input id="geminiCallThreshold" type="number" min="2" max="99" />
 
     <label>Azure DevOps PAT:</label>
     <div class="hint">Create from <a href="https://dev.azure.com/" target="_blank">Azure DevOps > User Settings > Personal Access Tokens</a></div>

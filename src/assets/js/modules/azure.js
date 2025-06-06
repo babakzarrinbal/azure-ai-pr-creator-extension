@@ -34,6 +34,7 @@ export async function getFilesOfRepo({azurePat}, repoUrl) {
 }
 
 export async function getFileContent({ azurePat }, fileUrl = null) {
+  console.log("Fetching file content from URL:", fileUrl);
   let { organization, project, repository, branch, filePath } = parseAzureUrl(fileUrl);
 
   const headers = {
@@ -82,62 +83,42 @@ export async function getFileContent({ azurePat }, fileUrl = null) {
   return await deletedFileRes.text();
 }
 
-export async function prCreator({ azurePat }, prs) {
+export async function prCreator({ azurePat }, prs, pullRequestBranch) {
   const prUrls = [];
 
   for (const pr of prs) {
     let { title, description, branch, commit_message, files = [] } = pr;
     files = files.map(f => ({ ...f, path: parseAzureUrl(f.url).filePath }));
-    branch = safeBranchName(branch);
-    const { organization, project, repository } = parseAzureUrl(files[0].url);
-
+    
+    let { organization, project, repository,branch: originBranch } = parseAzureUrl(files[0].url);
+    
     const headers = {
       Authorization: `Basic ${btoa(":" + azurePat)}`,
       "Content-Type": "application/json",
     };
 
-    const defaultBranch = await getDefaultBranch({ azurePat }, { organization, project, repository });
-    const branchExists = await checkBranchExists({ azurePat }, { organization, project, repository, branch });
-    const branchDeleted = await isBranchDeleted({ azurePat }, { organization, project, repository, branch });
+    originBranch = originBranch || await getDefaultBranch({ azurePat }, { organization, project, repository });
+    
 
-    let commitId = null;
-
-    if (branchExists && !branchDeleted) {
-      // Use existing branch
-      const commitsRes = await fetch(
-        `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repository}/commits?searchCriteria.itemVersion.version=${branch}&$top=1&api-version=7.0`,
-        { headers }
-      );
-      commitId = (await commitsRes.json()).value?.[0]?.commitId;
-    } else if (branchDeleted) {
-      // Get commit ID from last push before deletion
-      const pushListRes = await fetch(
-        `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repository}/pushes?searchCriteria.refName=refs/heads/${branch}&$top=1&api-version=7.0`,
-        { headers }
-      );
-      const pushList = await pushListRes.json();
-      const pushId = pushList.value?.[0]?.pushId;
-
-      if (pushId) {
-        const pushDetailsRes = await fetch(
-          `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repository}/pushes/${pushId}?includeRefUpdates=true&api-version=7.0`,
-          { headers }
-        );
-        const pushDetails = await pushDetailsRes.json();
-        const ref = pushDetails.refUpdates?.find(r => r.name === `refs/heads/${branch}`);
-        commitId = ref?.oldObjectId;
+    if (pullRequestBranch) {
+      branch = pullRequestBranch;
+    } else  {
+      branch = safeBranchName(branch)
+      let orgBranch = branch;
+      let branchVersion = 1;
+      while (
+        await checkBranchExists({ azurePat }, organization, project, repository, branch )
+      ) {
+        branch = `${orgBranch}-${branchVersion++}`;
+        console.log("⚠️ Branch already exists, creating new branch:", branch);
       }
     }
-
-    // Fallback: use default branch commit if none found
-    if (!commitId) {
-      const defaultCommitsRes = await fetch(
-        `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repository}/commits?searchCriteria.itemVersion.version=${defaultBranch}&$top=1&api-version=7.0`,
-        { headers }
-      );
-      commitId = (await defaultCommitsRes.json()).value?.[0]?.commitId;
-    }
-
+    const commitsRes = await fetch(
+      `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repository}/commits?searchCriteria.itemVersion.version=${originBranch}&$top=1&api-version=7.0`,
+      { headers }
+    );
+    const commitId = (await commitsRes.json()).value?.[0]?.commitId;
+    console.log("💡 Committing to:", { branch, commitId, files });
     const refUpdates = [
       { name: `refs/heads/${branch}`, oldObjectId: commitId }
     ];
@@ -192,7 +173,7 @@ export async function prCreator({ azurePat }, prs) {
           headers,
           body: JSON.stringify({
             sourceRefName: `refs/heads/${branch}`,
-            targetRefName: `refs/heads/${defaultBranch}`,
+            targetRefName: `refs/heads/${originBranch}`,
             title,
             description: `This PR was created dynamically for ${description}.`,
           }),
@@ -260,7 +241,7 @@ export function parseAzureUrl(url) {
 
 export async function checkBranchExists(
   { azurePat },
-  { organization, project, repository, branch },
+  organization, project, repository, branch ,
 ) {
   const url = `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repository}/pushes?searchCriteria.refName=refs/heads/${branch}&$top=1&api-version=7.0`;
   const headers = {
@@ -275,7 +256,7 @@ export async function checkBranchExists(
   return Array.isArray(data.value) && data.value.length > 0;
 }
 
-export async function isBranchDeleted({ azurePat }, { organization, project, repository, branch }) {
+export async function isBranchDeleted({ azurePat }, organization, project, repository, branch ) {
   const pushListUrl = `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repository}/pushes?searchCriteria.refName=refs/heads/${branch}&$top=1&api-version=7.0`;
   const headers = {
     Authorization: `Basic ${btoa(":" + azurePat)}`,

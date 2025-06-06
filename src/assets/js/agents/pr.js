@@ -1,5 +1,5 @@
 import { cleanAsk } from "../modules/gemini.js";
-import { prCreator, getFileContent, parseAzureUrl, getBranchAndFilesFromPRUrl, checkBranchExists, isBranchDeleted} from "../modules/azure.js";
+import { prCreator, getFileContent, getBranchAndFilesFromPRUrl} from "../modules/azure.js";
 
 const AGENT_CALL_SYSTEM_INSTRUCTION = `
 You are a PR Creation Agent, assisting in creating pull requests from a branch to the default branch.
@@ -12,8 +12,8 @@ If multiple repositories are referenced, generate multiple PRs inside the array.
 
 Rules:
 - If multiple repositories are referenced, create one PR object per repository inside the "pull_requests" array.
-- If a file is deleted, simply don't put the content in the "content" field.
-- alway give one pr with one or multiple files per repository.
+- If a file is deleted, simply put empty string in "content" field.
+- alway give one pr per repository.
 - Always return valid json
 
 
@@ -44,26 +44,17 @@ You are given a file content as prompt. Based on the ###INSTRUCTIONS###:
 ###INSTRUCTIONS###
 `;
 
-export async function act({ geminiKey, azurePat, geminiModel ,geminiCallThreshold}, prompt, referencePage) {
-  let branch, files;
-  console.log("referencePage", referencePage);
+export async function act({ geminiKey, azurePat, geminiModel}, prompt, referencePage) {
+  let pullRequestBranch, files=[];
   if (referencePage?.includes("/pullrequest/")) {
-    ({ branch, files } = await getBranchAndFilesFromPRUrl({azurePat},referencePage));
+    ({ branch:pullRequestBranch, files } = await getBranchAndFilesFromPRUrl({azurePat},referencePage));
   } else {
-    
-    
     files = [referencePage];
   }
-  prompt = prompt+ `\n\nRefrence files:\n${files.join("\n")}`;
+  prompt = prompt+ (files.length ?`\n\nReference files:\n${files.join("\n")}`:"");
   let prInfo;
-  let GeminiCalls = 0;
+
   try {
-    if(GeminiCalls++>= geminiCallThreshold) {
-      return {
-        message: "Gemini call threshold exceeded!",
-        status: "error",
-      };
-    }
     let prInfoRaw =  await cleanAsk(
           { geminiKey, geminiModel },
           prompt,
@@ -71,18 +62,16 @@ export async function act({ geminiKey, azurePat, geminiModel ,geminiCallThreshol
         )
     prInfo = JSON.parse(prInfoRaw);
     
-  } catch {
-      return {
+  } catch(err) {
+    console.error("Error creating pr", err);
+    return {
       message: "Failed to create PR!",
       status: "error",
     };
   }
   console.log("ai prInfo", prInfo);
   for (const pr of prInfo) {
-    branch && (pr.branch = branch);
     for (const f of pr.files) {
-      // const { organization, project, repository, branch, filePath } = parseAzureUrl(f.url);
-      // f.path = filePath;
       const fileContent = await getFileContent({azurePat},f.url);
       console.log("fileContent", fileContent);
       f.pr_type = (fileContent && f.pr_type === "add") ? "edit": f.pr_type;
@@ -95,11 +84,10 @@ export async function act({ geminiKey, azurePat, geminiModel ,geminiCallThreshol
               CODE_SUGGESTION_SYSTEM_INSTRUCTION + f.change_description
             ),
       );
-      f.path = parseAzureUrl(f.url).filePath;
     }
   }
   console.log("prInfo", prInfo);
-  const prUrls = await prCreator({ azurePat }, prInfo);
+  const prUrls = await prCreator({ azurePat }, prInfo, pullRequestBranch);
   console.log("prUrls", prUrls);
   return {
     pr: prUrls[0],
