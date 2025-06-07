@@ -2,8 +2,11 @@
 const pollInterval = 2000;
 var lastHistory = "";
 
+const getStore = ()=> new Promise(r => chrome.storage.local.get(["geminiKey", "azurePat", "geminiModel", "history", "geminiCallThreshold"], r));
+
+// const { azurePat, geminiKey, geminiModel, geminiCallThreshold } = await getStore();
 const renderHistory = async () => {
-  const history  = await (new Promise(r => chrome.storage.local.get(["history"], ({ history }) => r(history))));
+  const {history}  = await getStore();
   if (!history || history === lastHistory) return;
   output = document.getElementById("response");
   output.style.display = "block";
@@ -22,16 +25,36 @@ async function main() {
         fileActionBtn = el("fileButton"),
         repoScopeCheckbox = el("repoCheckbox"),
         repoCheckboxLabel = el("repoCheckboxLabel"),
+        settings = el("settings"),
         promptBox = el("prompt");
 
-  el("settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
-  const activeUrl = await (new Promise(r=> chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => r(tab?.url || ""))));
-  if (!activeUrl.includes("dev.azure.com")) {
+  const { azurePat, geminiKey, geminiModel, geminiCallThreshold } = await getStore();
+  settings.addEventListener("click", () => chrome.runtime.openOptionsPage());
+
+  if (!azurePat || !geminiKey || !geminiModel || !geminiCallThreshold) {
     Object.assign(promptBox, {
-      value: "Dude! I'm a azure devops extension remember! You should be in Azure DevOps repo/pull-request page.",
+      value: "Awww, how nice! you want to use me ?\n\nI'm not ready yet! Go to settings before .",
       disabled: true,
       style: { color: "red" }
     });
+    settings.src = "../icons/gear-alert.svg";
+    fileActionBtn.disabled = true;
+    fileActionBtn.textContent = "No API Keys";
+    fileActionBtn.style.backgroundColor = "#ccc";
+    repoCheckboxLabel.style.color = "#ccc";
+    repoScopeCheckbox.disabled = true;
+
+  }
+
+  const activeUrl = await (new Promise(r=> chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => r(tab?.url || ""))));
+  if (!activeUrl.includes("dev.azure.com")) {
+    Object.assign(promptBox, {
+      value: "Dude! I'm a azure devops extension remember!\n\nYou should be in Azure DevOps repo or pull-request page.",
+      disabled: true,
+      style: { color: "red" }
+    });
+
+    
     fileActionBtn.disabled = true;
     fileActionBtn.textContent = "Invalid Page";
     fileActionBtn.style.backgroundColor = "#ccc";

@@ -32,7 +32,9 @@
         border-radius: 8px;
         box-sizing: border-box;
       }
-
+      textarea::placeholder {
+        white-space: pre-line;
+      }
       .checkbox-container {
         display: flex;
         align-items: center;
@@ -118,7 +120,8 @@
 
     <textarea
       id="prompt"
-      placeholder="what? you lazy developer, you can't even create a pr? Just kidding! enter your change request here and I'll create a pr for it, don't forget to check if you want me to go through the whole repo."
+      placeholder="type your nonsense here, I'll do the PR for you.
+Remember I'm still too dumb, so be gentle."
     ></textarea>
 
     <div class="checkbox-container">
